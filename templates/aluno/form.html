@@ -1,30 +1,46 @@
 {% include 'cabecalho.html' %}
 
-
 <!-- Formulário de Aluno -->
 <h1 class="mb-4">Cadastrar Aluno</h1>
 
-
 <div class="row">
     <div class="col-12">
-      <form action="/aluno/salvar/{{ aluno[0] }}" method="POST">
+      <!-- Ajuste no Action: Se aluno existir, usa o ID, senão fica vazio -->
+      <form action="/aluno/salvar/{{ aluno[0] if aluno else '' }}" method="POST">
   
         <!-- Nome -->
         <div class="mb-3">
           <label for="nome" class="form-label">Nome</label>
-          <input type="text" class="form-control" id="nome" name="nome" value="{{ aluno[1] }}" required>
+          <input type="text" class="form-control" id="nome" name="nome" 
+                 value="{{ aluno[1] if aluno else '' }}" required>
         </div>
   
         <!-- Idade -->
         <div class="mb-3">
           <label for="idade" class="form-label">Idade</label>
-          <input type="number" class="form-control" id="idade" name="idade" value="{{ aluno[2] }}" required>
+          <input type="number" class="form-control" id="idade" name="idade" 
+                 value="{{ aluno[2] if aluno else '' }}" required>
         </div>
   
-        <!-- Cidade -->
-        <div class="mb-3">
-          <label for="cidade" class="form-label">Cidade</label>
-          <input type="text" class="form-control" id="cidade" name="cidade" value="{{ aluno[3] }}" required>
+        <!-- BLOCO DE SELEÇÃO DE CIDADE AUTOMÁTICA -->
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label for="uf" class="form-label">Estado</label>
+                <select class="form-select" id="uf">
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+
+            <div class="col-md-8 mb-3">
+                <label for="cidade" class="form-label">Cidade</label>
+                <select class="form-select" id="cidade" name="cidade" required>
+                    {% if aluno %}
+                        <option value="{{ aluno[3] }}" selected>{{ aluno[3] }}</option>
+                    {% else %}
+                        <option value="">Selecione o Estado primeiro...</option>
+                    {% endif %}
+                </select>
+            </div>
         </div>
   
         <!-- Botões -->
@@ -34,7 +50,52 @@
         </div>
     </form>
     </div>
-  </div>
+</div>
 
-  
- {% include 'rodape.html' %}
+<!-- SCRIPT DE INTEGRAÇÃO COM IBGE -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const ufSelect = document.getElementById("uf");
+        const cidadeSelect = document.getElementById("cidade");
+        
+        // 1. Busca os Estados na API do IBGE
+        fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome')
+            .then(response => response.json())
+            .then(estados => {
+                estados.forEach(estado => {
+                    const option = document.createElement("option");
+                    option.value = estado.sigla;
+                    option.textContent = estado.sigla + " - " + estado.nome;
+                    ufSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Erro ao carregar estados:', error));
+
+        // 2. Quando mudar o Estado, busca as Cidades
+        ufSelect.addEventListener("change", function() {
+            const uf = this.value;
+            
+            cidadeSelect.innerHTML = '<option value="">Carregando...</option>';
+            cidadeSelect.disabled = true;
+
+            if (uf) {
+                fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`)
+                    .then(response => response.json())
+                    .then(cidades => {
+                        cidadeSelect.innerHTML = '<option value="">Selecione a cidade</option>';
+                        cidades.forEach(cidade => {
+                            const option = document.createElement("option");
+                            option.value = cidade.nome;
+                            option.textContent = cidade.nome;
+                            cidadeSelect.appendChild(option);
+                        });
+                        cidadeSelect.disabled = false;
+                    });
+            } else {
+                cidadeSelect.innerHTML = '<option value="">Selecione o Estado primeiro...</option>';
+            }
+        });
+    });
+</script>
+ 
+{% include 'rodape.html' %}
